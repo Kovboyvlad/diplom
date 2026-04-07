@@ -1,0 +1,6 @@
+crewai>=1.8.1
+openai>=1.83.0
+python-dotenv>=1.1.1
+streamlit>=1.40.0
+pdfplumber>=0.11.9
+requests>=2.32.5

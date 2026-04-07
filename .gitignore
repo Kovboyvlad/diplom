@@ -1,0 +1,9 @@
+.env
+venv/
+__pycache__/
+*.pyc
+*.pyo
+agent_thoughts.log
+diagram.puml
+diagram.png
+history/

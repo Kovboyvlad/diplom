@@ -1,0 +1,55 @@
+ПРОЕКТ: Система управления гостиницей (Hotel Management System)
+
+ИСТОЧНИК: Bruegge & Dutoit «Object-Oriented Software Engineering», Chapter 7; стандартный кейс курсов по системному анализу
+
+1. ЦЕЛЬ СИСТЕМЫ:
+Автоматизировать управление номерным фондом гостиницы: бронирование, заселение,
+обслуживание номеров, питание и расчёт при выезде.
+
+2. СУЩНОСТИ И АТРИБУТЫ:
+
+- Hotel (Гостиница): hotelId: String, name: String, address: String,
+  starRating: int, totalRooms: int
+- Room (Номер): roomId: String, roomNumber: String, floor: int,
+  type: RoomType, pricePerNight: float, status: RoomStatus
+  Типы номера (RoomType): SINGLE, DOUBLE, SUITE, DELUXE, FAMILY
+  Статусы номера (RoomStatus): AVAILABLE, OCCUPIED, RESERVED, MAINTENANCE, CLEANING
+- Guest (Гость): guestId: String, fullName: String, passportNumber: String,
+  nationality: String, email: String, phone: String, loyaltyPoints: int
+- Reservation (Бронирование): reservationId: String, checkInDate: Date,
+  checkOutDate: Date, adultsCount: int, childrenCount: int,
+  status: ReservationStatus, totalPrice: float
+  Статусы бронирования (ReservationStatus): CONFIRMED, CHECKED_IN, CHECKED_OUT, CANCELLED, NO_SHOW
+- CheckIn (Заселение): checkInId: String, actualCheckIn: DateTime,
+  keyCardIssued: boolean
+- CheckOut (Выезд): checkOutId: String, actualCheckOut: DateTime,
+  finalBill: float
+- Service (Услуга): serviceId: String, name: String, price: float,
+  type: ServiceType
+  Типы услуг (ServiceType): ROOM_SERVICE, LAUNDRY, SPA, PARKING, MINIBAR
+- ServiceOrder (Заказ услуги): orderId: String, orderedAt: DateTime,
+  status: ServiceOrderStatus, totalCost: float
+  Статусы заказа услуги (ServiceOrderStatus): PENDING, IN_PROGRESS, COMPLETED, CANCELLED
+- Invoice (Счёт): invoiceId: String, issuedAt: DateTime,
+  totalAmount: float, paid: boolean, paymentMethod: String
+- Staff (Персонал): staffId: String, fullName: String, role: StaffRole
+  Роли персонала (StaffRole): RECEPTIONIST, HOUSEKEEPER, MANAGER, CONCIERGE
+
+3. СВЯЗИ:
+- Hotel содержит несколько Room (композиция)
+- Guest создаёт Reservation (ассоциация: один гость — много бронирований)
+- Reservation привязана к конкретному Room (ассоциация)
+- Reservation порождает CheckIn и CheckOut (композиция)
+- Guest заказывает ServiceOrder (ассоциация)
+- ServiceOrder ссылается на конкретную Service (ассоциация)
+- CheckOut генерирует Invoice (композиция)
+- Invoice включает все ServiceOrder гостя (агрегация)
+- Staff обрабатывает CheckIn/CheckOut (зависимость)
+
+4. ЛОГИКА:
+- Guest бронирует Room на даты → создаётся Reservation, Room.status → RESERVED.
+- При заезде: Staff создаёт CheckIn, Room.status → OCCUPIED, выдаётся ключ-карта.
+- Во время проживания Guest заказывает Service → создаётся ServiceOrder.
+- При выезде: создаётся CheckOut, формируется Invoice (стоимость номера + все ServiceOrder).
+- После оплаты Invoice: Room.status → CLEANING → после уборки → AVAILABLE.
+- При отмене бронирования за < 24 часа — штраф в размере стоимости одной ночи.

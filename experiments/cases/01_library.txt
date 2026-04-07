@@ -1,0 +1,43 @@
+ПРОЕКТ: Система управления библиотекой (Library Management System)
+
+ИСТОЧНИК: Larman C. «Applying UML and Patterns», Chapter 6-9 (классический учебный кейс)
+
+1. ЦЕЛЬ СИСТЕМЫ:
+Автоматизировать процессы выдачи, возврата и учёта книг в публичной библиотеке.
+Обеспечить регистрацию читателей, отслеживание наличия экземпляров и штрафов за просрочку.
+
+2. СУЩНОСТИ И АТРИБУТЫ:
+
+- Book (Книга): isbn: String, title: String, author: String, genre: String, publishYear: int
+- BookCopy (Экземпляр книги): copyId: String, status: CopyStatus, location: String
+  Статусы экземпляра (CopyStatus): AVAILABLE, BORROWED, RESERVED, LOST
+- Member (Читатель): memberId: String, fullName: String, email: String, phone: String,
+  registrationDate: Date, membershipExpiry: Date, status: MemberStatus
+  Статусы читателя (MemberStatus): ACTIVE, SUSPENDED, EXPIRED
+- Loan (Выдача): loanId: String, borrowDate: Date, dueDate: Date, returnDate: Date,
+  status: LoanStatus
+  Статусы выдачи (LoanStatus): ACTIVE, RETURNED, OVERDUE
+- Reservation (Бронирование): reservationId: String, reservationDate: Date,
+  expiryDate: Date, status: ReservationStatus
+  Статусы бронирования (ReservationStatus): PENDING, FULFILLED, CANCELLED, EXPIRED
+- Fine (Штраф): fineId: String, amount: float, reason: String, paid: boolean,
+  issueDate: Date
+- Librarian (Библиотекарь): employeeId: String, fullName: String, login: String
+- Catalog (Каталог): — сервис поиска книг по названию, автору, жанру, ISBN
+
+3. СВЯЗИ:
+- Book содержит один или несколько BookCopy (композиция: один-ко-многим)
+- Member берёт BookCopy через Loan (ассоциация: один читатель — много выдач)
+- Loan может порождать Fine при просрочке (зависимость)
+- Member может создать Reservation на Book (ассоциация: один читатель — много бронирований)
+- Reservation привязана к конкретному Book (ассоциация)
+- Librarian управляет Loan и Fine (зависимость)
+- Catalog агрегирует Book (агрегация)
+
+4. ЛОГИКА:
+- Читатель ищет книгу через Catalog. Если есть свободный экземпляр — оформляется Loan.
+- Если свободных экземпляров нет — создаётся Reservation.
+- При просрочке возврата статус Loan меняется на OVERDUE, автоматически создаётся Fine.
+- Читатель со статусом SUSPENDED не может брать книги (Fine не оплачен).
+- Librarian регистрирует возврат: Loan.status → RETURNED, BookCopy.status → AVAILABLE.
+- Если есть активная Reservation на возвращённую книгу — BookCopy.status → RESERVED.

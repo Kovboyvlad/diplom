@@ -1,0 +1,130 @@
+Use Case UC1: Process Sale
+Primary Actor: Cashier
+Stakeholders and Interests:
+- Cashier: Wants accurate, fast entry, and no payment errors, as cash drawer short
+ages are deducted from his/her salary.
+- Salesperson: Wants sales commissions updated.
+- Customer: Wants purchase and fast service with minimal effort. Wants proof of pur
+chase to support returns.
+- Company: Wants to accurately record transactions and satisfy customer interests.
+Wants to ensure that Payment Authorization Service payment receivables are
+recorded. Wants some fault tolerance to allow sales capture even if server compo
+nents (e.g., remote credit validation) are unavailable. Wants automatic and fast
+update of accounting and inventory.
+- Government Tax Agencies: Want to collect tax from every sale. May be multiple agen
+cies, such as national, state, and county.
+- Payment Authorization Service: Wants to receive digital authorization requests in the
+correct format and protocol. Wants to accurately account for their payables to the
+store.
+Preconditions: Cashier is identified and authenticated.
+Success Guarantee (Postconditions): Sale is saved. Tax is correctly calculated.
+Accounting and Inventory are updated. Commissions recorded. Receipt is generated.
+Payment authorization approvals are recorded.
+Main Success Scenario (or Basic Flow):
+1. Customer arrives at POS checkout with goods and/or services to purchase.
+2. Cashier starts a new sale.
+3. Cashier enters item identifier.
+4. System records sale line item and presents item description, price, and running total.
+Price calculated from a set of price rules.
+Cashier repeats steps 3-4 until indicates done.
+50
+FULLY DRESSED EXAMPLE: PROCESS SALE
+5. System presents total with taxes calculated.
+6. Cashier tells Customer the total, and asks for payment.
+7. Customer pays and System handles payment.
+8. System logs completed sale and sends sale and payment information to the external
+Accounting system (for accounting and commissions) and Inventory system (to
+update inventory).
+9. System presents receipt.
+10.Customer leaves with receipt and goods (if any).
+Extensions (or Alternative Flows):
+*a. At any time, System fails:
+To support recovery and correct accounting, ensure all transaction sensitive state
+and events can be recovered from any step of the scenario.
+1. Cashier restarts System, logs in, and requests recovery of prior state.
+2. System reconstructs prior state.
+2a. System detects anomalies preventing recovery:
+1. System signals error to the Cashier, records the error, and enters a clean
+state.
+2. Cashier starts a new sale.
+3a. Invalid identifier:
+1. System signals error and rejects entry. 3b. There are multiple of same item
+category and tracking unique item identity not
+important (e.g., 5 packages of veggie-burgers):
+1. Cashier can enter item category identifier and the quantity.
+3-6a: Customer asks Cashier to remove an item from the purchase:
+1. Cashier enters item identifier for removal from sale.
+2. System displays updated running total.
+3-6b. Customer tells Cashier to cancel sale:
+1. Cashier cancels sale on System.
+3-6c. Cashier suspends the sale:
+1. System records sale so that it is available for retrieval on any POS terminal. 4a.
+The system generated item price is not wanted (e.g., Customer complained about
+something and is offered a lower price):
+1. Cashier enters override price.
+2. System presents new price.
+5a. System detects failure to communicate with external tax calculation system service:
+1. System restarts the service on the POS node, and continues. 1a. System
+detects that the service does not restart.
+1. System signals error.
+2. Cashier may manually calculate and enter the tax, or cancel the sale.
+5b. Customer says they are eligible for a discount (e.g., employee, preferred customer):
+1. Cashier signals discount request.
+2. Cashier enters Customer identification.
+3. System presents discount total, based on discount rules.
+5c. Customer says they have credit in their account, to apply to the sale:
+1. Cashier signals credit request.
+2. Cashier enters Customer identification.
+3. Systems applies credit up to price=0, and reduces remaining credit.
+6a. Customer says they intended to pay by cash but don't have enough cash:
+1a. Customer uses an alternate payment method.
+1b. Customer tells Cashier to cancel sale. Cashier cancels sale on System.
+51
+52
+6 - USE-CASE MODEL: WRITING REQUIREMENTS IN CONTEXT
+7a. Paying by cash:
+1. Cashier enters the cash amount tendered.
+2. System presents the balance due, and releases the cash drawer.
+3. Cashier deposits cash tendered and returns balance in cash to Customer.
+4. System records the cash payment.
+7b. Paying by credit:
+1. Customer enters their credit account information.
+2. System sends payment authorization request to an external Payment Authoriza
+tion Service System, and requests payment approval.
+2a. System detects failure to collaborate with external system:
+1. System signals error to Cashier.
+2. Cashier asks Customer for alternate payment.
+3. System receives payment approval and signals approval to Cashier.
+3a. System receives payment denial:
+1. System signals denial to Cashier.
+2. Cashier asks Customer for alternate payment.
+4. System records the credit payment, which includes the payment approval.
+5. System presents credit payment signature input mechanism.
+6. Cashier asks Customer for a credit payment signature. Customer enters signa
+ture.
+7c. Paying by check...
+7d. Paying by debit...
+7e. Customer presents coupons:
+1. Before handling payment, Cashier records each coupon and System reduces
+price as appropriate. System records the used coupons for accounting reasons.
+1a. Coupon entered is not for any purchased item:
+1. System signals error to Cashier. 9a.
+There are product rebates:
+1. System presents the rebate forms and rebate receipts for each item with a
+rebate.
+9b. Customer requests gift receipt (no prices visible): 1.
+Cashier requests gift receipt and System presents it.
+Special Requirements:
+- Touch screen Ul on a large flat panel monitor. Text must be visible from 1 meter.
+- Credit authorization response within 30 seconds 90% of the time.
+- Somehow, we want robust recovery when access to remote services such the inven
+tory system is failing.
+- Language internationalization on the text displayed.
+- Pluggable business rules to be insertable at steps 3 and 7.
+Technology and Data Variations List:
+3a. Item identifier entered by bar code laser scanner (if bar code is present) or keyboard.
+3b. Item identifier may be any UPC, EAN, JAN, or SKU coding scheme.
+7a. Credit account information entered by card reader or keyboard.
+7b. Credit payment signature captured on paper receipt. But within two years, we predict many customers will want digital signature capture.
+FULLY DRESSED EXAMPLE: PROCESS SALE
+Frequency of Occurrence: Could be nearly continuous

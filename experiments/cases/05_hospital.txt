@@ -1,0 +1,64 @@
+ПРОЕКТ: Система управления больницей (Hospital Management System)
+
+ИСТОЧНИК: Sommerville I. «Software Engineering», 10th ed., Chapter 5; стандартный кейс в курсах по UML и системному анализу
+
+1. ЦЕЛЬ СИСТЕМЫ:
+Автоматизировать управление лечебным процессом: регистрацию пациентов,
+запись к врачам, ведение медицинских карт, назначение лечения и управление палатами.
+
+2. СУЩНОСТИ И АТРИБУТЫ:
+
+- Patient (Пациент): patientId: String, fullName: String, dateOfBirth: Date,
+  gender: Gender, bloodType: BloodType, phone: String, address: String,
+  insuranceNumber: String, status: PatientStatus
+  Пол (Gender): MALE, FEMALE
+  Группа крови (BloodType): A_POS, A_NEG, B_POS, B_NEG, O_POS, O_NEG, AB_POS, AB_NEG
+  Статусы пациента (PatientStatus): OUTPATIENT, INPATIENT, DISCHARGED, CRITICAL
+- Doctor (Врач): doctorId: String, fullName: String, specialization: String,
+  licenseNumber: String, phone: String, status: DoctorStatus
+  Статусы врача (DoctorStatus): AVAILABLE, BUSY, ON_LEAVE
+- Department (Отделение): departmentId: String, name: String, floor: int,
+  headDoctor: Doctor
+- Ward (Палата): wardId: String, wardNumber: String, capacity: int,
+  occupiedBeds: int, type: WardType
+  Типы палаты (WardType): GENERAL, INTENSIVE_CARE, SURGERY, MATERNITY, PEDIATRIC
+- Appointment (Приём): appointmentId: String, scheduledAt: DateTime,
+  duration: int, reason: String, status: AppointmentStatus
+  Статусы приёма (AppointmentStatus): SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW
+- MedicalRecord (Медкарта): recordId: String, createdAt: Date, updatedAt: Date
+- Diagnosis (Диагноз): diagnosisId: String, icdCode: String, description: String,
+  severity: Severity, diagnosedAt: DateTime
+  Серьёзность (Severity): MILD, MODERATE, SEVERE, CRITICAL
+- Prescription (Назначение): prescriptionId: String, issuedAt: DateTime,
+  validUntil: Date, notes: String
+- Medication (Лекарство): medicationId: String, name: String, dosage: String,
+  frequency: String, duration: int
+- LabTest (Анализ): testId: String, testType: String, orderedAt: DateTime,
+  completedAt: DateTime, result: String, status: LabTestStatus
+  Статусы анализа (LabTestStatus): ORDERED, IN_PROGRESS, COMPLETED, CANCELLED
+- Admission (Госпитализация): admissionId: String, admittedAt: DateTime,
+  dischargedAt: DateTime, reason: String
+
+3. СВЯЗИ:
+- Patient имеет одну MedicalRecord (композиция)
+- MedicalRecord содержит несколько Diagnosis (композиция)
+- MedicalRecord содержит несколько Prescription (композиция)
+- MedicalRecord содержит несколько LabTest (композиция)
+- Prescription содержит несколько Medication (агрегация)
+- Patient записывается к Doctor через Appointment (ассоциация)
+- Doctor принадлежит Department (ассоциация)
+- Department содержит несколько Ward (композиция)
+- Patient при госпитализации помещается в Ward через Admission (ассоциация)
+- Doctor ставит Diagnosis и выписывает Prescription (зависимость)
+- Doctor назначает LabTest (зависимость)
+
+4. ЛОГИКА:
+- Patient регистрируется в системе → создаётся MedicalRecord.
+- Patient записывается на Appointment к Doctor нужной специализации.
+- Doctor проводит приём: ставит Diagnosis, назначает LabTest и/или Prescription.
+- При необходимости госпитализации: создаётся Admission, Patient помещается в Ward.
+- Patient.status → INPATIENT. Ward.occupiedBeds увеличивается.
+- При критическом состоянии: Patient переводится в Ward типа INTENSIVE_CARE.
+- При выписке: Admission.dischargedAt фиксируется, Patient.status → DISCHARGED,
+  Ward.occupiedBeds уменьшается.
+- LabTest проходит цикл: ORDERED → IN_PROGRESS → COMPLETED, результат вносится в MedicalRecord.

@@ -1,0 +1,46 @@
+ПРОЕКТ: Система банкомата (ATM System)
+
+ИСТОЧНИК: Fowler M. «UML Distilled», Chapter 3; Rumbaugh «Object-Oriented Modeling and Design» (классический кейс для диаграмм состояний и последовательности)
+
+1. ЦЕЛЬ СИСТЕМЫ:
+Обеспечить самообслуживание клиентов банка: снятие наличных, просмотр баланса,
+пополнение счёта и смену PIN-кода через банкомат.
+
+2. СУЩНОСТИ И АТРИБУТЫ:
+
+- ATM (Банкомат): atmId: String, location: String, cashAmount: float,
+  status: ATMStatus
+  Статусы банкомата (ATMStatus): IDLE, IN_USE, OUT_OF_CASH, MAINTENANCE
+- Card (Карта): cardNumber: String, expiryDate: Date, cardType: CardType
+  Типы карты (CardType): DEBIT, CREDIT
+- Session (Сессия): sessionId: String, startTime: DateTime, endTime: DateTime,
+  attemptsCount: int, status: SessionStatus
+  Статусы сессии (SessionStatus): ACTIVE, COMPLETED, BLOCKED
+- Account (Счёт): accountId: String, balance: float, accountType: AccountType,
+  status: AccountStatus
+  Типы счёта (AccountType): CHECKING, SAVINGS
+  Статусы счёта (AccountStatus): ACTIVE, FROZEN, CLOSED
+- Transaction (Транзакция): transactionId: String, type: TransactionType,
+  amount: float, timestamp: DateTime, status: TransactionStatus
+  Типы транзакции (TransactionType): WITHDRAWAL, DEPOSIT, BALANCE_INQUIRY, PIN_CHANGE
+  Статусы транзакции (TransactionStatus): SUCCESS, FAILED, CANCELLED
+- BankServer (Сервер банка): — внешняя система для авторизации и обработки транзакций
+- Receipt (Чек): receiptId: String, content: String, printedAt: DateTime
+
+3. СВЯЗИ:
+- ATM проводит Session (композиция: один банкомат — много сессий)
+- Session привязана к Card (ассоциация)
+- Card связана с одним или несколькими Account (ассоциация)
+- Session содержит одну или несколько Transaction (композиция)
+- Transaction может порождать Receipt (зависимость)
+- ATM обращается к BankServer для проверки PIN и авторизации транзакции (зависимость)
+- BankServer управляет Account (зависимость)
+
+4. ЛОГИКА:
+- Клиент вставляет Card → ATM создаёт Session, запрашивает PIN.
+- PIN отправляется на BankServer для проверки. При 3 неверных попытках — Card изымается, Session.status → BLOCKED.
+- При успешном PIN → клиент выбирает операцию:
+  - Снятие: ATM проверяет ATM.cashAmount >= запрошенной суммы, BankServer проверяет Account.balance. При успехе — выдаёт наличные, создаёт Transaction, печатает Receipt.
+  - Баланс: BankServer возвращает Account.balance, печатается Receipt.
+  - Пополнение: клиент вносит наличные, ATM.cashAmount увеличивается, BankServer обновляет Account.balance.
+- По завершении — Session.status → COMPLETED, карта возвращается.

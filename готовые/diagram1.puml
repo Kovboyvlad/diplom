@@ -1,0 +1,436 @@
+@startuml
+' Диаграмма классов POS UC1: Process Sale
+
+set namespaceSeparator ::
+skinparam classAttributeIconSize 0
+
+package "Внешние актёры (люди)" {
+  class "Кассир" as Cashier <<block>> {
+    +role: string = "Primary"
+    +id: string
+    +permissions: string[*]
+    +authenticate(credentials): Session
+    +startSale(): void
+    +scanOrEnterItem(code: string, qty: int=1): void
+    +requestDiscount(reason: string): void
+    +applyCoupon(code: string): void
+    +identifyCustomer(customerId: string): void
+    +enterManualTax(amount: Money): void
+    +selectPayment(method: string): void
+    +enterCash(amount: Money): void
+    +askForSignature(mode: string): void
+    +suspendSale(): void
+    +resumeSale(saleId: UUID): void
+    +cancelSale(): void
+    +requestGiftReceipt(): void
+  }
+
+  class "Покупатель" as Customer <<block>> {
+    +customerId: string
+    +eligibleDiscounts: string[*]
+    +provideItems(): void
+    +choosePayment(method: string): void
+    +presentCoupons(codes: string[*]): void
+    +provideIdentification(id: string): void
+    +sign(signatureRef: string): void
+  }
+
+  class "Продавец (Salesperson)" as Salesperson <<block>> {
+    +employeeId: string
+    +commissionRate: decimal
+    +getCommissionBaseForSale(saleId: UUID): Money
+  }
+}
+
+package "Внешние заинтересованные стороны (организации)" {
+  class "Налоговые органы" as TaxAuthority <<block>> {
+    +jurisdictionCodes: string[*]
+    +receiveTaxReports(batchId: string): void
+  }
+
+  class "Компания (владелец магазина)" as StoreOwner <<block>> {
+    +companyId: string
+    +policyOverridesAllowed: bool
+    +auditOverrides(saleId: UUID): void
+  }
+}
+
+package "Внешние ИТ-системы (интеграции)" {
+  class "Сервис авторизации платежей" as PaymentAuth <<block>> {
+    +provider: string
+    +slaP90ResponseSec: int = 30
+    +authorize(amount: Money, currency: string, token: string, meta: map): AuthResponse
+    +voidAuth(authCode: string): bool
+  }
+
+  class "Бухгалтерская система" as Accounting <<block>> {
+    +endpoint: URL
+    +postSale(event: SalePostedEvent): Ack
+    +recordCommissions(saleId: UUID, data: map): Ack
+  }
+
+  class "Система управления запасами" as Inventory <<block>> {
+    +endpoint: URL
+    +decrementStock(event: StockDecrementEvent): Ack
+  }
+
+  class "Внешний сервис расчёта налогов" as ExternalTax <<block>> {
+    +endpoint: URL
+    +calculateTax(request: CalculateTaxRequest): CalculateTaxResponse
+  }
+}
+
+package "POS (Система под разработкой)" {
+  class "POS-Приложение (UI/Touch Frontend)" as POSApp <<block>> {
+    +locale: string
+    +largeFonts: bool = true
+    +currentView: string
+    +displaySale(lines: list, totals: map): void
+    +prompt(message: string): void
+    +showError(code: string, message: string): void
+    +showSignaturePrompt(mode: string): void
+    +showChange(amount: Money): void
+    +showReceiptReady(type: string): void
+  }
+
+  class "POS Orchestrator (Процесс Продажи)" as Orchestrator <<block>> {
+    +currentSaleId: UUID
+    +state: string <<Draft|Suspended|Completed|Cancelled>>
+    +lastEventId: UUID
+    +startSale(cashierId: string): UUID
+    +scanItem(code: string, qty: int=1): void
+    +removeLine(lineId: UUID): void
+    +overridePrice(lineId: UUID, newPrice: Money, reason: string, by: string): void
+    +applyCoupon(code: string): void
+    +identifyCustomer(customerId: string): void
+    +applyCustomerCredit(customerId: string, amount?: Money): void
+    +calculateTax(): void
+    +choosePayment(method: string): void
+    +payCash(amountTendered: Money): void
+    +payCard(tokenOrInputRef: string, amount: Money): void
+    +payCheck(amount: Money, checkData: map): void
+    +suspendSale(): void
+    +resumeSale(saleId: UUID): void
+    +cancelSale(): void
+    +printReceipt(options: map): void
+    +printGiftReceipt(): void
+    +onDeviceEvent(event: map): void
+    +onRecoveryAvailable(saleId: UUID): void
+  }
+
+  class "Модуль продажи (Sale Domain Service)" as SaleDomain <<block>> {
+    +saleId: UUID
+    +status: string
+    +subtotal: Money
+    +discountTotal: Money
+    +taxTotal: Money
+    +grandTotal: Money
+    +lines: SaleLine[*]
+    +payments: Payment[*]
+    +invariantsOk: bool
+    +createDraft(cashierId: string): UUID
+    +addLine(sku: string, desc: string, qty: int, unitPrice: Money): UUID
+    +removeLine(lineId: UUID): void
+    +applyDiscount(lineId?: UUID, amount: Money, reason: string): void
+    +applyTax(breakdown: map, method: string, confirmerId?: string): void
+    +recordPayment(method: string, amount: Money, details: map): void
+    +recalculateTotals(): void
+    +markSuspended(): void
+    +markCancelled(): void
+    +markCompleted(): void
+  }
+
+  class "Каталог/Прайсинг" as CatalogPricing <<block>> {
+    +cacheEnabled: bool
+    +cacheItems: int
+    +findItemByCode(code: string): Item
+    +getBasePrice(item: Item): Money
+    +overridePrice(itemCode: string, price: Money, reason: string, by: string): void
+  }
+
+  class "Движок бизнес-правил" as RulesEngine <<block>> {
+    +rulesets: string[*]
+    +runPricingRules(context: map): map
+    +runDiscountRules(context: map): map
+    +runTenderRules(context: map): map
+  }
+
+  class "Модуль купонов/скидок/кредитов" as DiscountsService <<block>> {
+    +validateCoupon(code: string, sale: map): ValidationResult
+    +applyDiscountsByCustomer(customerId: string, sale: map): map
+    +applyCustomerCredit(customerId: string, sale: map, amount?: Money): map
+  }
+
+  class "Модуль расчёта налогов" as TaxModule <<block>> {
+    +timeoutSec: int = 10
+    +retries: int = 2
+    +calculateTax(saleId: UUID, items: list, location: string): CalculateTaxResponse
+    +fallbackManualTax(amount: Money, confirmerId: string): void
+  }
+
+  class "Модуль оплаты" as PaymentsService <<block>> {
+    +lastAuthCode: string
+    +processCash(amountTendered: Money, total: Money): Change
+    +requestCardAuthorization(amount: Money, tokenOrInputRef: string): AuthResponse
+    +recordAuthorization(data: map): void
+    +handleDecline(reason: string): void
+    +captureSignature(mode: string): SignatureRef
+  }
+
+  class "Модуль печати" as PrintingService <<block>> {
+    +templates: string[*]
+    +printReceipt(saleId: UUID, options: map): PrintJobId
+    +printGiftReceipt(saleId: UUID): PrintJobId
+    +printRebateForms(saleId: UUID, items: list): PrintJobId
+  }
+
+  class "Подсистема локальных устройств" as DevicesManager <<block>> {
+    +drivers: map
+    +queueDepth: int
+    +openCashDrawer(): void
+    +startCardInput(): string
+    +readScanner(): string
+    +captureDigitalSignature(): SignatureRef
+    +print(data: bytes): void
+    +emitEvent(event: map): void
+  }
+
+  class "Модуль интеграций (шлюз)" as IntegrationGateway <<block>> {
+    +outboxBatchSize: int = 100
+    +enqueueAccounting(saleId: UUID): void
+    +enqueueInventory(saleId: UUID): void
+    +retryPending(): int
+    +deliverNext(): bool
+  }
+
+  class "Модуль журналирования и восстановления" as JournalRecovery <<block>> {
+    +lastSnapshotId: UUID
+    +appendEvent(saleId: UUID, type: string, payload: map): UUID
+    +snapshot(saleId: UUID, state: map): UUID
+    +recoverSale(saleId?: UUID): map
+    +logAnomaly(saleId: UUID, code: string, detail: string): void
+  }
+
+  class "Аутентификация кассира (AuthN/AuthZ)" as AuthService <<block>> {
+    +authenticate(user: string, secret: string): Session
+    +authorize(user: string, permission: string): bool
+  }
+
+  class "Хранилище (Persistence/Outbox)" as Persistence <<block>> {
+    +dbFile: string
+    +saveSale(sale: map): void
+    +saveSaleLine(line: map): void
+    +savePayment(payment: map): void
+    +saveAuthorization(auth: map): void
+    +saveTax(tax: map): void
+    +writeOutbox(event: map): void
+    +readOutbox(batch: int): list
+    +loadSale(saleId: UUID): map
+  }
+
+  class "I18N/Config/Secrets" as ConfigI18N <<block>> {
+    +getConfig(key: string): string
+    +getSecret(name: string): string
+    +translate(key: string, locale: string): string
+  }
+}
+
+package "Оборудование/Интерфейсы" {
+  class "Сканер штрихкодов" as Scanner <<block>> {
+    +status: string
+    +scan(): string
+  }
+
+  class "Клавиатура" as Keyboard <<block>> {
+    +status: string
+    +readInput(): string
+  }
+
+  class "Кард-ридер/Пин-пад" as CardReader <<block>> {
+    +status: string
+    +beginCardEntry(): string
+    +cancel(): void
+  }
+
+  class "Сенсорная панель/Подпись" as SignaturePad <<block>> {
+    +mode: string <<paper|digital>>
+    +capture(): SignatureRef
+    +acknowledgePaper(): void
+  }
+
+  class "Денежный ящик" as CashDrawer <<block>> {
+    +locked: bool
+    +open(): void
+    +status(): string
+  }
+
+  class "Принтер чеков" as ReceiptPrinter <<block>> {
+    +model: string
+    +printReceipt(data: bytes): PrintJobId
+    +printGiftReceipt(data: bytes): PrintJobId
+    +printRebateForms(data: bytes): PrintJobId
+  }
+}
+
+' ----------------------- Связи (управление -->, данные ..>) -----------------------
+
+' Актёры к POS UI и устройствам
+Cashier --> POSApp : управление сценарием
+Cashier ..> Keyboard : ввод кодов/сумм
+Cashier ..> Scanner : сканирование SKU
+Cashier ..> SignaturePad : подтверждение подписи (бумажн./цифр.)
+
+Customer ..> POSApp : идентификация/купоны/запросы
+Customer ..> CardReader : реквизиты карты
+Customer ..> SignaturePad : подпись
+
+' UI к Оркестратору
+POSApp --> Orchestrator : команды UI
+
+' Оркестратор к домену и сервисам
+Orchestrator --> SaleDomain : управление продажей
+Orchestrator --> CatalogPricing : запрос товара/цены
+Orchestrator --> RulesEngine : пайплайны правил
+Orchestrator --> DiscountsService : купоны/скидки/кредиты
+Orchestrator --> TaxModule : CalculateTax()
+Orchestrator --> PaymentsService : сценарии оплаты
+Orchestrator --> PrintingService : печать
+Orchestrator --> DevicesManager : управление устройствами
+Orchestrator --> JournalRecovery : журналировать события
+Orchestrator --> AuthService : проверка прав
+Orchestrator --> IntegrationGateway : публикация в outbox/доставка
+
+' Обратные события от устройств к оркестратору
+DevicesManager ..> Orchestrator : события устройств
+
+' Домены и сервисы к хранилищу (данные)
+SaleDomain ..> Persistence : Sales/SaleLines/Tax
+PaymentsService ..> Persistence : Payments/Authorizations
+JournalRecovery ..> Persistence : Events/Snapshots
+IntegrationGateway ..> Persistence : Read Outbox
+
+' Модули к внешним системам (данные)
+TaxModule ..> ExternalTax : CalculateTaxRequest/Response
+PaymentsService ..> PaymentAuth : AuthRequest/Response
+IntegrationGateway ..> Accounting : SalePostedEvent
+IntegrationGateway ..> Inventory : StockDecrementEvent
+Accounting ..> TaxAuthority : отчёты/агрегации налогов
+
+' Подсистема устройств
+DevicesManager --> Scanner : init/read
+DevicesManager --> Keyboard : read
+DevicesManager --> CardReader : beginCardEntry/cancel
+DevicesManager --> CashDrawer : open
+DevicesManager ..> ReceiptPrinter : данные печати
+PrintingService ..> ReceiptPrinter : данные чеков/ребейтов
+DevicesManager ..> SignaturePad : захват подписи
+
+' UI взаимодействие с печатью (через оркестратор/сервис печати)
+POSApp ..> PrintingService : данные макетов/опций
+
+' Каталог/Прайсинг и правила
+CatalogPricing --> RulesEngine : запрос правил ценообразования
+DiscountsService --> RulesEngine : правила скидок/кредитов
+
+' ----------------------- Ассоциации данных (доп. метки) -----------------------
+Orchestrator ..> POSApp : события: SaleUpdated/TotalsUpdated/Errors
+PaymentsService ..> Orchestrator : PaymentApproved/Declined
+TaxModule ..> Orchestrator : TaxSucceeded/ManualRequired
+PrintingService ..> Orchestrator : ReceiptReady
+
+' ----------------------- Доп. классы-структуры (как типы) -----------------------
+class "SaleLine" as SaleLine <<block>> {
+  +lineId: UUID
+  +sku: string
+  +description: string
+  +qty: int
+  +unitPrice: Money
+  +discountApplied: Money
+  +extendedPrice: Money
+  +taxClass: string
+  +overrides: string[*]
+}
+
+class "Payment" as Payment <<block>> {
+  +method: string <<cash|card|check|debit|credit>>
+  +amount: Money
+  +changeAmount: Money
+  +status: string <<pending|approved|declined>>
+  +details: map
+}
+
+class "Item" as Item <<block>> {
+  +sku: string
+  +barcode: string
+  +description: string
+  +basePrice: Money
+  +taxCategory: string
+}
+
+class "AuthResponse" as AuthResponse <<block>> {
+  +approved: bool
+  +authCode: string
+  +rrn: string
+  +declineReason: string
+  +avsCvv: string
+}
+
+class "CalculateTaxRequest" as CalculateTaxRequest <<block>> {
+  +saleId: UUID
+  +items: list
+  +location: string
+}
+
+class "CalculateTaxResponse" as CalculateTaxResponse <<block>> {
+  +itemsTax: map
+  +totalTax: Money
+  +jurisdictions: string[*]
+}
+
+class "SalePostedEvent" as SalePostedEvent <<block>> {
+  +saleId: UUID
+  +timestamp: datetime
+  +lines: list
+  +payments: list
+  +taxes: map
+  +discounts: list
+  +coupons: list
+  +commissionsBase: Money
+  +authorizations: list
+}
+
+class "StockDecrementEvent" as StockDecrementEvent <<block>> {
+  +saleId: UUID
+  +timestamp: datetime
+  +items: list
+}
+
+class "ValidationResult" as ValidationResult <<block>> {
+  +valid: bool
+  +reason: string
+}
+
+class "Change" as Change <<block>> {
+  +amount: Money
+}
+
+class "SignatureRef" as SignatureRef <<block>> {
+  +mode: string
+  +reference: string
+}
+
+' Ассоциации типов
+SaleDomain "1" o-- "*" SaleLine
+SaleDomain "1" o-- "*" Payment
+
+' ----------------------- Ограничения и инварианты (атрибуты/методы) -----------------------
+class "Инварианты продажи" as SaleInvariants <<block>> {
+  +sumPaymentsEqualsGrandTotal(changeDeducted: bool=true): bool
+  +taxIsAutoOrManualConfirmed(): bool
+  +cardAuthRecordedForCardPayments(): bool
+  +taxInvalidatedOnContentChange(): bool
+}
+
+SaleDomain ..> SaleInvariants : проверка инвариантов
+
+@enduml

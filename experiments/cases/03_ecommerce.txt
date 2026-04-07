@@ -1,0 +1,55 @@
+ПРОЕКТ: Платформа интернет-магазина (E-Commerce Platform)
+
+ИСТОЧНИК: Larman C. «Applying UML and Patterns», Sales domain case; Evans E. «Domain-Driven Design» примеры
+
+1. ЦЕЛЬ СИСТЕМЫ:
+Обеспечить полный цикл онлайн-торговли: от просмотра каталога и оформления заказа
+до оплаты, доставки и возврата товаров.
+
+2. СУЩНОСТИ И АТРИБУТЫ:
+
+- Customer (Покупатель): customerId: String, email: String, passwordHash: String,
+  fullName: String, phone: String, registrationDate: Date
+- Address (Адрес): addressId: String, country: String, city: String,
+  street: String, zip: String
+- Product (Товар): productId: String, name: String, description: String,
+  price: float, stockQuantity: int, status: ProductStatus
+  Статусы товара (ProductStatus): ACTIVE, OUT_OF_STOCK, DISCONTINUED
+- Category (Категория): categoryId: String, name: String, parentCategory: Category
+- Cart (Корзина): cartId: String, createdAt: DateTime, updatedAt: DateTime
+- CartItem (Позиция корзины): quantity: int, priceAtAdd: float
+- Order (Заказ): orderId: String, createdAt: DateTime, totalAmount: float,
+  status: OrderStatus
+  Статусы заказа (OrderStatus): PENDING, CONFIRMED, PAID, SHIPPED, DELIVERED, CANCELLED, REFUNDED
+- OrderItem (Позиция заказа): quantity: int, priceAtOrder: float
+- Payment (Оплата): paymentId: String, amount: float, method: PaymentMethod,
+  status: PaymentStatus, transactionId: String, paidAt: DateTime
+  Методы оплаты (PaymentMethod): CREDIT_CARD, DEBIT_CARD, PAYPAL, CRYPTO
+  Статусы оплаты (PaymentStatus): PENDING, SUCCESS, FAILED, REFUNDED
+- Shipment (Доставка): shipmentId: String, trackingNumber: String,
+  carrier: String, shippedAt: DateTime, estimatedDelivery: Date,
+  status: ShipmentStatus
+  Статусы доставки (ShipmentStatus): PREPARING, SHIPPED, IN_TRANSIT, DELIVERED, RETURNED
+- Review (Отзыв): reviewId: String, rating: int, comment: String, createdAt: DateTime
+
+3. СВЯЗИ:
+- Customer имеет несколько Address (агрегация)
+- Customer владеет одной Cart (композиция)
+- Cart содержит несколько CartItem (композиция)
+- CartItem ссылается на Product (ассоциация)
+- Customer создаёт несколько Order (ассоциация)
+- Order содержит несколько OrderItem (композиция)
+- OrderItem ссылается на Product (ассоциация)
+- Order имеет один Payment (композиция)
+- Order имеет один Shipment (композиция)
+- Product принадлежит одной или нескольким Category (ассоциация)
+- Customer оставляет Review на Product (ассоциация)
+
+4. ЛОГИКА:
+- Customer добавляет Product в Cart → создаётся CartItem.
+- При оформлении заказа: Cart конвертируется в Order, проверяется stockQuantity.
+- Order.status → PENDING → Customer оплачивает → Payment создаётся.
+- При успешной оплате: Payment.status → SUCCESS, Order.status → PAID, stockQuantity уменьшается.
+- Создаётся Shipment. При отгрузке Order.status → SHIPPED.
+- При доставке Order.status → DELIVERED, Customer может оставить Review.
+- При отмене/возврате: Payment.status → REFUNDED, stockQuantity восстанавливается.
