@@ -3,7 +3,13 @@ venv/
 __pycache__/
 *.pyc
 *.pyo
-agent_thoughts.log
+agent_thoughts.log*
+О дипломе.md
+План теории.md
 diagram.puml
 diagram.png
+history/
+.claude/
+CLAUDE.md
+experiments/results/
 history/

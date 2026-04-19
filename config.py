@@ -14,7 +14,7 @@ DIAGRAM_TYPES = {
 MODELS = {
     "ChatGPT (gpt-5)": "gpt-5",
     "Claude (claude-3-5-haiku)": "anthropic/claude-3-5-haiku-20241022",
-    "Gemini (gemini-1.5-flash)": "gemini/gemini-1.5-flash",
+    "Gemini (gemini-3-flash-preview)": "gemini/gemini-3-flash-preview",
 }
 
 
@@ -31,5 +31,8 @@ def setup() -> str:
         proxy_url = f"http://{user}:{pwd}@{proxy_host}:{proxy_port}"
         os.environ["HTTP_PROXY"]  = proxy_url
         os.environ["HTTPS_PROXY"] = proxy_url
+
+    # Gemini — LiteLLM читает GEMINI_API_KEY автоматически после load_dotenv()
+    # Claude  — LiteLLM читает ANTHROPIC_API_KEY автоматически после load_dotenv()
 
     return os.getenv("OPENAI_MODEL_NAME", "gpt-5")

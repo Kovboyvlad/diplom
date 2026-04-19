@@ -32,16 +32,48 @@ def validate_puml(puml_code: str) -> bool:
     return "@startuml" in puml_code and "@enduml" in puml_code
 
 
-def render_png(puml_code: str, timeout: int = 15) -> bytes | None:
+def render_png(puml_code: str, timeout: int = 60) -> bytes | None:
     """
-    Отправляет PlantUML-код на публичный сервер и возвращает PNG как байты.
+    Отправляет PlantUML-код на сервер и возвращает PNG как байты.
+    Порядок попыток: kroki.io → plantuml.com POST → plantuml.com GET.
     Возвращает None при ошибке.
     """
-    encoded = _encode_plantuml(puml_code)
-    url = f"http://www.plantuml.com/plantuml/png/{encoded}"
+    # 1. kroki.io — надёжнее для больших диаграмм, HTTPS
     try:
-        response = requests.get(url, timeout=timeout)
-        response.raise_for_status()
-        return response.content
+        response = requests.post(
+            "https://kroki.io/plantuml/png",
+            data=puml_code.encode("utf-8"),
+            headers={"Content-Type": "text/plain; charset=utf-8"},
+            timeout=timeout,
+        )
+        if response.status_code == 200 and response.content[:4] == b"\x89PNG":
+            return response.content
     except requests.RequestException:
-        return None
+        pass
+
+    # 2. plantuml.com POST — запасной вариант
+    try:
+        response = requests.post(
+            "http://www.plantuml.com/plantuml/png/",
+            data=puml_code.encode("utf-8"),
+            headers={"Content-Type": "text/plain; charset=utf-8"},
+            timeout=timeout,
+        )
+        if response.status_code == 200 and response.content[:4] == b"\x89PNG":
+            return response.content
+    except requests.RequestException:
+        pass
+
+    # 3. plantuml.com GET — для коротких диаграмм
+    try:
+        encoded = _encode_plantuml(puml_code)
+        response = requests.get(
+            f"http://www.plantuml.com/plantuml/png/{encoded}",
+            timeout=timeout,
+        )
+        if response.status_code == 200 and response.content[:4] == b"\x89PNG":
+            return response.content
+    except requests.RequestException:
+        pass
+
+    return None

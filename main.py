@@ -2,6 +2,7 @@
 CLI-режим: запускает пайплайн с требованиями из REQUIREMENTS_TEXT и сохраняет diagram.puml / diagram.png.
 Для интерактивного режима используй: streamlit run app.py
 """
+import time
 from pathlib import Path
 
 import config
@@ -14,19 +15,6 @@ REQUIREMENTS_TEXT = """\
 1. ЦЕЛЬ СИСТЕМЫ:
 Обеспечить автоматическое распределение задач между сервером и автономными
 роботами-погрузчиками для перемещения паллет без участия человека.
-
-2. КЛЮЧЕВЫЕ ЭЛЕМЕНТЫ (СУЩНОСТИ):
-- WMS-Сервер (Central System): Главный управляющий модуль. Хранит БД заказов и карту склада.
-- Робот-AGV (Automated Guided Vehicle): Автономный погрузчик. Параметры: ID, Статус, BatteryLevel.
-- Зона Приемки (Inbound Zone): Место появления новых грузов. Оборудована датчиком.
-- Стеллаж (Storage Rack): Конечное место хранения груза. Координаты (X, Y).
-- Зарядная Станция (Charging Station): Место для подзарядки роботов.
-
-3. ФУНКЦИОНАЛЬНАЯ ЛОГИКА:
-- Инициация: Датчик в Зоне Приемки отправляет сигнал "NewItem" на WMS-Сервер.
-- Распределение: Сервер выбирает ближайшего свободного робота с зарядом > 20%.
-- Выполнение: Сервер передаёт роботу координаты груза и целевого Стеллажа.
-- Исключение: Если заряд <= 20%, Робот едет на Зарядную Станцию (статус ServiceMode).
 """
 
 DIAGRAM_TYPE = "class"  # class | sequence | component | activity
@@ -36,7 +24,9 @@ def main():
     config.setup()
     print("### Запуск AI-агентов (CLI-режим)... ###")
 
-    raw = run_pipeline(REQUIREMENTS_TEXT, DIAGRAM_TYPE)
+    t_start = time.time()
+    raw, critique = run_pipeline(REQUIREMENTS_TEXT, DIAGRAM_TYPE)
+    generation_time_sec = time.time() - t_start
     puml_code = clean_output(raw)
 
     if not validate_puml(puml_code):
@@ -56,6 +46,11 @@ def main():
 
     print("\n### РЕЗУЛЬТАТ ###")
     print(puml_code)
+
+    print(f"\nВремя генерации: {generation_time_sec:.1f} с")
+
+    print("\n### ЗАМЕЧАНИЯ КРИТИКА ###")
+    print(critique)
 
 
 if __name__ == "__main__":

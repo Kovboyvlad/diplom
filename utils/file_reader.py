@@ -18,7 +18,6 @@ def read_pdf(path: str) -> str:
 
 def read_uploaded_file(uploaded_file) -> str:
     """
-    Читает файл, загруженный через st.file_uploader.
     Поддерживает .txt и .pdf.
     """
     name = uploaded_file.name.lower()
