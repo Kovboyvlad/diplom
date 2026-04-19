@@ -9,7 +9,5 @@ agent_thoughts.log*
 diagram.puml
 diagram.png
 history/
-.claude/
-CLAUDE.md
 experiments/results/
 history/
