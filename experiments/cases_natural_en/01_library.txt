@@ -1,0 +1,9 @@
+We need a library management system.
+
+Readers come in, search for books, and borrow them for a period of time. Each book can have multiple copies — one copy may be checked out while another is on the shelf. If a needed book is currently unavailable, the reader must be able to place a reservation and receive a notification when it becomes available.
+
+Readers register in the system. If a reader fails to return a book on time, a fine is charged. While the fine remains unpaid, the reader cannot borrow new books.
+
+Librarians register checkouts and returns. When a book is returned, the system must check whether anyone has a reservation for it.
+
+A catalog search is also required — by title, author, and genre.

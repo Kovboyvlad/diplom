@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 
 import config
-from agents.pipeline import run_pipeline, run_evaluation
+from agents.pipeline import run_pipeline, run_single_agent, run_evaluation
 from utils.diagram import clean_output, validate_puml, render_png
 from utils.file_reader import read_uploaded_file
 from utils.metrics import compute_metrics, save_history, load_history
@@ -121,6 +121,13 @@ with tab_generate:
         )
         model_id = config.MODELS[model_label]
 
+        pipeline_mode = st.radio(
+            "Режим генерации",
+            options=["Мультиагентный пайплайн (5 агентов)", "Одиночный агент (baseline)"],
+            help="Baseline: только один агент-кодер без Analyst и Architect. Используется для сравнения.",
+        )
+        use_single_agent = pipeline_mode.startswith("Одиночный")
+
         run_analysis = st.toggle("Требуется анализ результатов", value=False,
                                  help="Запускает агента-оценщика после генерации. Увеличивает время.")
 
@@ -141,7 +148,10 @@ with tab_generate:
                     progress.progress(10, text="Анализ требований...")
 
                     t_start = time.time()
-                    raw_result, critique = run_pipeline(requirements, diagram_type, model_id)
+                    if use_single_agent:
+                        raw_result, critique = run_single_agent(requirements, diagram_type, model_id)
+                    else:
+                        raw_result, critique = run_pipeline(requirements, diagram_type, model_id)
                     generation_time_sec = time.time() - t_start
 
                     progress.progress(75, text="Валидация...")
@@ -168,7 +178,8 @@ with tab_generate:
                         if png_bytes:
                             Path("diagram.png").write_bytes(png_bytes)
 
-                        save_history(requirements, diagram_type, model_id, puml_code, png_bytes, metrics, critique, evaluation, generation_time_sec)
+                        save_history(requirements, diagram_type, model_id, puml_code, png_bytes, metrics, critique, evaluation, generation_time_sec,
+                                     pipeline_mode="single" if use_single_agent else "multi")
 
                         progress.progress(100, text="Готово!")
                         status.success("Диаграмма сгенерирована и сохранена в историю.")
@@ -340,10 +351,13 @@ with tab_analytics:
                 continue
             meta    = json.loads(meta_path.read_text(encoding="utf-8"))
             metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+            mode_raw = meta.get("pipeline_mode", "multi")
+            mode_label = "1 агент" if mode_raw == "single" else "5 агентов"
             row = {
                 "Дата":    meta.get("timestamp", ""),
                 "Тип":     meta.get("diagram_type", ""),
                 "Модель":  meta.get("model", ""),
+                "Режим":   mode_label,
                 "Время (с)": meta.get("generation_time_sec"),
             }
             row.update(metrics)   # все метрики как есть
@@ -355,23 +369,31 @@ with tab_analytics:
         rename_map = {k: METRIC_LABELS[k] for k in df.columns if k in METRIC_LABELS}
         df_display = df.rename(columns=rename_map)
 
+        # ── Фильтр по режиму ──────────────────────────────────────────────────
+        modes_available = ["все"] + sorted(df["Режим"].unique().tolist())
+        mode_filter = st.radio("Показать режим", modes_available, horizontal=True)
+        df_filtered_mode = df if mode_filter == "все" else df[df["Режим"] == mode_filter]
+        df_display_filtered = df_display if mode_filter == "все" else df_display[df["Режим"] == mode_filter]
+
+        st.divider()
+
         # ── Сводные метрики ────────────────────────────────────────────────────
         a1, a2, a3, a4, a5 = st.columns(5)
-        a1.metric("Всего запусков",   len(df))
-        bc = df.get("block_count", pd.Series(dtype=float)).dropna()
+        a1.metric("Всего запусков",   len(df_filtered_mode))
+        bc = df_filtered_mode.get("block_count", pd.Series(dtype=float)).dropna()
         a2.metric("Среднее блоков",   round(bc.mean(), 1) if not bc.empty else "—")
-        rc = df.get("relation_count", pd.Series(dtype=float)).dropna()
+        rc = df_filtered_mode.get("relation_count", pd.Series(dtype=float)).dropna()
         a3.metric("Среднее связей",   round(rc.mean(), 1) if not rc.empty else "—")
-        cp = df.get("entity_coverage_pct", pd.Series(dtype=float)).dropna()
+        cp = df_filtered_mode.get("entity_coverage_pct", pd.Series(dtype=float)).dropna()
         a4.metric("Среднее покрытие", f"{round(cp.mean(), 1)}%" if not cp.empty else "—")
-        times = df["Время (с)"].dropna()
+        times = df_filtered_mode["Время (с)"].dropna()
         a5.metric("Среднее время",    f"{round(times.mean(), 1)} с" if not times.empty else "—")
 
         st.divider()
 
         # ── Таблица ────────────────────────────────────────────────────────────
         st.markdown("**Все запуски**")
-        st.dataframe(df_display, use_container_width=True, hide_index=True)
+        st.dataframe(df_display_filtered, use_container_width=True, hide_index=True)
 
         st.divider()
 
@@ -380,16 +402,16 @@ with tab_analytics:
 
         with chart_col1:
             st.markdown("**Среднее кол-во блоков по моделям**")
-            if df["Модель"].nunique() > 1 and "block_count" in df.columns:
-                chart_data = df.groupby("Модель")["block_count"].mean().rename("Блоков")
+            if df_filtered_mode["Модель"].nunique() > 1 and "block_count" in df_filtered_mode.columns:
+                chart_data = df_filtered_mode.groupby("Модель")["block_count"].mean().rename("Блоков")
                 st.bar_chart(chart_data)
             else:
                 st.caption("Недостаточно данных (нужно ≥ 2 разных модели).")
 
         with chart_col2:
             st.markdown("**Среднее покрытие требований по типам диаграмм**")
-            if df["Тип"].nunique() > 1 and "entity_coverage_pct" in df.columns:
-                chart_data2 = df.groupby("Тип")["entity_coverage_pct"].mean().rename("Покрытие %")
+            if df_filtered_mode["Тип"].nunique() > 1 and "entity_coverage_pct" in df_filtered_mode.columns:
+                chart_data2 = df_filtered_mode.groupby("Тип")["entity_coverage_pct"].mean().rename("Покрытие %")
                 st.bar_chart(chart_data2)
             else:
                 st.caption("Недостаточно данных (нужно ≥ 2 разных типа).")

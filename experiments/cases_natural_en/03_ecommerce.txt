@@ -1,0 +1,9 @@
+We need an online store.
+
+Customers register, browse products by category, and add items to a shopping cart. When ready, they place an order, specify a delivery address, and make a payment. Payment options include credit card and PayPal.
+
+After payment, the store assembles the order and hands it off to a courier. The customer can track the delivery status. Once the item is received, the customer can leave a review.
+
+If something goes wrong, the customer can cancel the order or request a return. When a return is processed, the payment is refunded.
+
+A product cannot be purchased if it is out of stock. After a purchase, the stock quantity decreases; after a return, it is restored.

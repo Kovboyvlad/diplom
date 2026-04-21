@@ -1,0 +1,9 @@
+We need a hospital management system.
+
+Patients are registered in the system. A medical record is created for each patient, containing all information: diagnoses, prescriptions, and test results.
+
+A patient schedules an appointment with the required specialist. The doctor conducts the appointment, makes a diagnosis, and may prescribe treatment or order lab tests. Lab tests are processed in the laboratory and the results are entered into the patient's medical record.
+
+If a patient needs to be hospitalized, they are admitted to a ward. Wards are of different types: general, intensive care, surgery, and pediatrics. The system must track the number of occupied beds in each ward. Critical patients can be transferred to intensive care.
+
+When a patient is discharged, the ward bed is freed. Doctors belong to departments; each department has a head physician.

@@ -1,0 +1,9 @@
+We need a software system for an ATM (Automated Teller Machine).
+
+The customer inserts a card and enters a PIN code. If the PIN is entered incorrectly three times in a row, the card is blocked and retained. After successful login, the customer can withdraw cash, check their balance, deposit funds, or change their PIN.
+
+For cash withdrawal, the system checks whether the account has sufficient funds and whether the ATM has enough cash available. After a successful transaction, a receipt is printed.
+
+The ATM communicates with a bank server to verify the card and process transactions. Every operation is logged.
+
+At the end of the session, the card is returned to the customer.

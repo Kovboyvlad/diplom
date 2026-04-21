@@ -12,7 +12,7 @@ _BLOCK_PATTERNS = {
     "activity":  r'^\s*:([^:;\n]+);',
 }
 
-_ARROW_RE = re.compile(r'-->|\.\.>|\*--|o--|<\|--|--|->>|->')
+_ARROW_RE = re.compile(r'-->|\.\.>|\.\.\|>|\*--|o--|<\|--|<\|\.\.|\.\.|--|->>|->')
 
 _STOP_WORDS = {
     "это", "для", "что", "при", "или", "если", "есть", "также", "через",
@@ -69,7 +69,7 @@ def compute_metrics(puml_code: str, requirements: str = "", diagram_type: str = 
 
     # Связи
     all_relations = re.findall(
-        r'(\w[\w\s"]*)\s*(-->|\.\.>|\*--|o--|<\|--|<\|\.\.|\.\.|--|->>|->|\.>)\s*(\w[\w\s"]*)',
+        r'(\w[\w\s"]*)\s*(-->|\.\.>|\.\.\|>|\*--|o--|<\|--|<\|\.\.|\.\.|--|->>|->|\.>)\s*(\w[\w\s"]*)',
         puml_code,
     )
     m["relation_count"] = len(all_relations)
@@ -167,6 +167,7 @@ def save_history(
     evaluation: str | None = None,
     generation_time_sec: float | None = None,
     experiment_id: str | None = None,
+    pipeline_mode: str = "multi",
     base_dir: str = "history",
 ) -> Path:
     """Сохраняет результат генерации в папку history/<timestamp>."""
@@ -192,6 +193,7 @@ def save_history(
         "model":               model,
         "generation_time_sec": round(generation_time_sec, 1) if generation_time_sec is not None else None,
         "experiment_id":       experiment_id,
+        "pipeline_mode":       pipeline_mode,
     }
     (folder / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     (folder / "metrics.json").write_text(json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")

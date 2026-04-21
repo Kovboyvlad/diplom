@@ -1,0 +1,15 @@
+We have a retail store with a cashier desk. A cashier serves customers at a Point-of-Sale (POS) terminal.
+
+A customer arrives with items. The cashier starts a new sale and scans items one by one — by barcode or manual entry. The system immediately displays the item name, price, and running total. Prices are calculated using configurable pricing rules.
+
+When all items are scanned, the system calculates the total including taxes. Taxes can be applied at multiple levels — federal, regional, and local. If the tax service is unavailable, the cashier enters the tax amount manually.
+
+The customer pays. Payment methods include: cash, credit card, check, and debit card. For cash payments, the system calculates the change amount. For card payments, an authorization request is sent to an external payment service — if unavailable, the cashier asks for an alternative payment method. The customer may also apply coupons or redeem account credit.
+
+After payment, the system sends the sale data to the accounting system and inventory system, and prints a receipt. Optionally, a gift receipt without prices can be printed.
+
+During operation, exceptions may occur: invalid barcode, cashier wants to remove an item, customer wants to cancel the purchase, cashier suspends the sale (to resume at another terminal), price needs to be overridden manually.
+
+If the system crashes, the cashier must be able to recover the state of an incomplete sale after restart. This is critical because the cashier is responsible for any discrepancies in the cash drawer.
+
+Additional requirements: touchscreen interface, large font, multi-language support, card authorization must complete within 30 seconds in 90% of cases.

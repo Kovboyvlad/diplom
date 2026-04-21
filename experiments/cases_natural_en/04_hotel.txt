@@ -1,0 +1,11 @@
+We need a hotel management system.
+
+Guests book rooms for specific dates. Rooms come in different types — single, double, suite, etc. — with different prices. At check-in, a receptionist processes the arrival and issues a key card.
+
+During the stay, a guest can order additional services: room service, laundry, parking. All extras are added to the final bill.
+
+At checkout, a bill is generated for the entire stay — room cost plus all ordered services. The guest pays and leaves. After checkout, the room is cleaned and becomes available again.
+
+If a guest cancels their reservation less than 24 hours before check-in, a one-night cancellation fee is charged.
+
+Different staff members have different roles: receptionists handle check-in and check-out, housekeepers clean rooms, managers have full visibility.
