@@ -53,7 +53,46 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("AI-генератор архитектурных диаграмм")
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+}
+
+p, li, .stMarkdown {
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+h1, h2, h3 {
+    font-weight: 500;
+    letter-spacing: -0.3px;
+}
+
+.stButton > button {
+    border-radius: 6px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+}
+
+.stTabs [data-baseweb="tab"] {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 400;
+}
+
+[data-testid="metric-container"] {
+    background: transparent;
+    border: 1px solid #E0DED9;
+    border-radius: 8px;
+    padding: 12px 16px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.title("Генератор архитектурных диаграмм")
 st.caption("Введите требования к системе — ИИ-агенты сгенерируют PlantUML-диаграмму.")
 
 tab_generate, tab_history, tab_analytics = st.tabs(
@@ -405,20 +444,54 @@ with tab_analytics:
         st.divider()
 
         # ── Графики ────────────────────────────────────────────────────────────
+
+        # 1. Сравнение режимов
+        st.markdown("**Сравнение режимов генерации**")
+        mode_cols = ["block_count", "entity_coverage_pct", "excess_elements_pct"]
+        available_mode_cols = [c for c in mode_cols if c in df_filtered_mode.columns]
+        if df_filtered_mode["Режим"].nunique() >= 1 and available_mode_cols:
+            mode_chart = (
+                df_filtered_mode.groupby("Режим")[available_mode_cols]
+                .mean()
+                .rename(columns={
+                    "block_count": "Блоков",
+                    "entity_coverage_pct": "Покрытие req (%)",
+                    "excess_elements_pct": "Лишние эл. (%)",
+                })
+            )
+            st.bar_chart(mode_chart)
+        else:
+            st.caption("Нет данных для сравнения режимов.")
+
+        st.divider()
+
         chart_col1, chart_col2 = st.columns(2)
 
+        # 2. Стоимость vs качество
         with chart_col1:
-            st.markdown("**Среднее кол-во блоков по моделям**")
-            if df_filtered_mode["Модель"].nunique() > 1 and "block_count" in df_filtered_mode.columns:
-                chart_data = df_filtered_mode.groupby("Модель")["block_count"].mean().rename("Блоков")
-                st.bar_chart(chart_data)
+            st.markdown("**Стоимость vs покрытие требований**")
+            scatter_cols = ["Стоимость ($)", "entity_coverage_pct", "Режим"]
+            scatter_df = df_filtered_mode.copy()
+            scatter_df = scatter_df.rename(columns={"entity_coverage_pct": "Покрытие (%)"})
+            scatter_df = scatter_df[["Стоимость ($)", "Покрытие (%)", "Режим"]].dropna()
+            if not scatter_df.empty:
+                st.scatter_chart(scatter_df, x="Стоимость ($)", y="Покрытие (%)", color="Режим")
             else:
-                st.caption("Недостаточно данных (нужно ≥ 2 разных модели).")
+                st.caption("Нет данных о стоимости.")
 
+        # 3. Токены по режимам
         with chart_col2:
-            st.markdown("**Среднее покрытие требований по типам диаграмм**")
-            if df_filtered_mode["Тип"].nunique() > 1 and "entity_coverage_pct" in df_filtered_mode.columns:
-                chart_data2 = df_filtered_mode.groupby("Тип")["entity_coverage_pct"].mean().rename("Покрытие %")
-                st.bar_chart(chart_data2)
+            st.markdown("**Токены по режимам**")
+            token_cols = ["Prompt tokens", "Completion tokens"]
+            if all(c in df_filtered_mode.columns for c in token_cols):
+                token_chart = (
+                    df_filtered_mode.groupby("Режим")[token_cols]
+                    .mean()
+                    .dropna()
+                )
+                if not token_chart.empty:
+                    st.bar_chart(token_chart)
+                else:
+                    st.caption("Нет данных о токенах.")
             else:
-                st.caption("Недостаточно данных (нужно ≥ 2 разных типа).")
+                st.caption("Нет данных о токенах.")
