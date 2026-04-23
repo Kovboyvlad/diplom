@@ -58,8 +58,6 @@ METRIC_LABELS = {
     "alt_block_count":          "Ветвлений (alt)",
     "loop_count":               "Циклов (loop)",
     "activation_count":         "Активаций",
-    # Component
-    # (interface_count, package_count уже есть выше)
     # Activity
     "swimlane_count":           "Swimlane-полос",
     "decision_count":           "Решений (if)",
@@ -77,8 +75,8 @@ st.set_page_config(
 st.title("AI-генератор архитектурных диаграмм")
 st.caption("Введите требования к системе — ИИ-агенты сгенерируют PlantUML-диаграмму.")
 
-tab_generate, tab_history, tab_analytics, tab_experiments = st.tabs(
-    ["Генерация", "История", "Аналитика", "Эксперименты"]
+tab_generate, tab_history, tab_analytics = st.tabs(
+    ["Генерация", "История", "Аналитика"]
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -126,7 +124,7 @@ with tab_generate:
             options=[
                 "Мультиагентный пайплайн (5 агентов)",
                 "Мультиагентный slim (ограниченный контекст)",
-                "Одиночный агент (baseline)",
+                "Одиночный агент",
             ],
             help=(
                 "Slim: каждый агент видит только вывод предыдущего — экономит токены. "
@@ -443,82 +441,3 @@ with tab_analytics:
                 st.bar_chart(chart_data2)
             else:
                 st.caption("Недостаточно данных (нужно ≥ 2 разных типа).")
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Вкладка: Эксперименты
-# ══════════════════════════════════════════════════════════════════════════════
-with tab_experiments:
-    st.subheader("Результаты экспериментов")
-    st.caption("Запускай эксперименты через `python experiments/runner.py`")
-
-    results_root = Path("experiments/results")
-    experiments = sorted(results_root.iterdir()) if results_root.exists() else []
-    experiments = [e for e in experiments if e.is_dir() and (e / "summary.csv").exists()]
-
-    if not experiments:
-        st.info("Нет данных. Запусти `python experiments/runner.py` чтобы начать.")
-    else:
-        exp_names = [e.name for e in experiments]
-        selected = st.selectbox("Выбрать эксперимент", exp_names)
-        exp_dir = results_root / selected
-
-        # Конфиг
-        cfg_path = exp_dir / "config.json"
-        if cfg_path.exists():
-            cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
-            cc1, cc2, cc3, cc4 = st.columns(4)
-            cc1.metric("Папка кейсов", Path(cfg.get("cases_dir", "")).name)
-            cc2.metric("Типов диаграмм", len(cfg.get("diagram_types", [])))
-            cc3.metric("Моделей", len(cfg.get("models", [])))
-            cc4.metric("Запущен", cfg.get("started_at", "—")[:10])
-
-        st.divider()
-
-        # Загружаем summary.csv
-        df_exp = pd.read_csv(exp_dir / "summary.csv")
-        df_ok = df_exp[df_exp.get("status", pd.Series(["ok"] * len(df_exp))) == "ok"]
-
-        # ── Сводная таблица ────────────────────────────────────────────────────
-        st.markdown("**Все запуски**")
-
-        # Переименовываем метрики
-        rename_exp = {k: METRIC_LABELS[k] for k in df_exp.columns if k in METRIC_LABELS}
-        st.dataframe(df_exp.rename(columns=rename_exp), use_container_width=True, hide_index=True)
-
-        col_dl, _ = st.columns([1, 3])
-        with col_dl:
-            st.download_button(
-                "Скачать summary.csv",
-                (exp_dir / "summary.csv").read_bytes(),
-                "summary.csv", "text/csv",
-                use_container_width=True,
-            )
-
-        st.divider()
-
-        # ── Сравнение моделей ──────────────────────────────────────────────────
-        if not df_ok.empty and "model" in df_ok.columns:
-            st.markdown("**Сравнение моделей**")
-
-            numeric_cols = [c for c in df_ok.select_dtypes("number").columns
-                            if c not in ("status",)]
-            metric_choice = st.selectbox(
-                "Метрика для сравнения",
-                options=numeric_cols,
-                format_func=lambda k: METRIC_LABELS.get(k, k),
-            )
-
-            # Фильтр по типу диаграммы
-            types_available = df_ok["diagram_type"].unique().tolist()
-            type_filter = st.selectbox("Тип диаграммы", ["все"] + types_available)
-            df_filtered = df_ok if type_filter == "все" else df_ok[df_ok["diagram_type"] == type_filter]
-
-            if "case" in df_filtered.columns and "model" in df_filtered.columns:
-                pivot = (
-                    df_filtered.groupby(["case", "model"])[metric_choice]
-                    .mean()
-                    .unstack("model")
-                )
-                st.markdown(f"Среднее `{METRIC_LABELS.get(metric_choice, metric_choice)}` по кейсам и моделям:")
-                st.dataframe(pivot.round(2), use_container_width=True)
-                st.bar_chart(pivot)
