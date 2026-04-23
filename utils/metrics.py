@@ -4,7 +4,6 @@ from pathlib import Path
 from datetime import datetime
 
 
-# ── Паттерны блоков по типу диаграммы ─────────────────────────────────────────
 _BLOCK_PATTERNS = {
     "class":     r'^\s*(?:abstract\s+class|class|interface|enum)\s+["\']?(\w[\w\s]*)["\']?',
     "sequence":  r'^\s*(?:participant|actor|boundary|control|entity|database)\s+["\']?(\w[\w\s]*)["\']?',
@@ -30,16 +29,13 @@ def _name_in_requirements(name: str, req_lower: str, req_words: set) -> bool:
     """
     name_lower = name.lower()
 
-    # 1. Прямое вхождение
     if name_lower in req_lower:
         return True
 
-    # 2. Разбиваем PascalCase/camelCase на части и ищем каждую в требованиях
     parts = [p.lower() for p in _CAMEL_SPLIT_RE.findall(name) if len(p) > 2]
     if any(p in req_lower for p in parts):
         return True
 
-    # 3. Слова из требований встречаются внутри имени (AGV → "agv" в "agvrobot")
     if any(w in name_lower for w in req_words if len(w) > 2):
         return True
 
@@ -54,12 +50,9 @@ def compute_metrics(puml_code: str, requirements: str = "", diagram_type: str = 
     """
     m = {}
 
-    # ── Универсальные ──────────────────────────────────────────────────────────
-
     m["syntax_valid"] = int("@startuml" in puml_code and "@enduml" in puml_code)
     m["diagram_lines"] = len(puml_code.splitlines())
 
-    # Имена блоков (зависит от типа)
     pattern = _BLOCK_PATTERNS.get(diagram_type, _BLOCK_PATTERNS["class"])
     block_names = [
         n.strip() for n in re.findall(pattern, puml_code, re.MULTILINE | re.IGNORECASE)
@@ -67,7 +60,6 @@ def compute_metrics(puml_code: str, requirements: str = "", diagram_type: str = 
     ]
     m["block_count"] = len(block_names)
 
-    # Связи
     all_relations = re.findall(
         r'(\w[\w\s"]*)\s*(-->|\.\.>|\.\.\|>|\*--|o--|<\|--|<\|\.\.|\.\.|--|->>|->|\.>)\s*(\w[\w\s"]*)',
         puml_code,
@@ -78,7 +70,6 @@ def compute_metrics(puml_code: str, requirements: str = "", diagram_type: str = 
         round(m["relation_count"] / m["block_count"], 2) if m["block_count"] > 0 else 0.0
     )
 
-    # Покрытие требований (bag-of-words)
     req_words: set[str] = set()
     req_lower = requirements.lower()
     if requirements.strip():
@@ -93,7 +84,6 @@ def compute_metrics(puml_code: str, requirements: str = "", diagram_type: str = 
     else:
         m["entity_coverage_pct"] = 0.0
 
-    # Лишние элементы — блоки, название которых не соотносится с требованиями
     if block_names and requirements.strip():
         unmatched = sum(
             1 for name in block_names
@@ -103,15 +93,12 @@ def compute_metrics(puml_code: str, requirements: str = "", diagram_type: str = 
     else:
         m["excess_elements_pct"] = 0.0
 
-    # Изолированные узлы — блоки без единой стрелки
     relation_lines_text = " ".join(
         line for line in puml_code.splitlines() if _ARROW_RE.search(line)
     ).lower()
     m["isolated_nodes_count"] = sum(
         1 for name in block_names if name.lower() not in relation_lines_text
     )
-
-    # ── Специфичные по типу ───────────────────────────────────────────────────
 
     if diagram_type == "class":
         m["attribute_count"] = len(re.findall(
@@ -127,7 +114,6 @@ def compute_metrics(puml_code: str, requirements: str = "", diagram_type: str = 
         m["avg_attributes_per_class"] = (
             round(m["attribute_count"] / m["block_count"], 2) if m["block_count"] > 0 else 0.0
         )
-        # Кратность связей: "1", "0..*", "1..1" рядом со стрелкой
         rel_lines = [l for l in puml_code.splitlines() if _ARROW_RE.search(l)]
         with_mult = [
             l for l in rel_lines
@@ -147,7 +133,6 @@ def compute_metrics(puml_code: str, requirements: str = "", diagram_type: str = 
         m["package_count"] = len(re.findall(r'^\s*package\b', puml_code, re.MULTILINE | re.IGNORECASE))
 
     elif diagram_type == "activity":
-        # Уникальные swimlane-полосы
         swimlanes = set(re.findall(r'^\s*\|([^|]+)\|', puml_code, re.MULTILINE))
         m["swimlane_count"] = len(swimlanes)
         m["decision_count"] = len(re.findall(r'^\s*if\b', puml_code, re.MULTILINE | re.IGNORECASE))
@@ -168,6 +153,7 @@ def save_history(
     generation_time_sec: float | None = None,
     experiment_id: str | None = None,
     pipeline_mode: str = "multi",
+    usage: dict | None = None,
     base_dir: str = "history",
 ) -> Path:
     """Сохраняет результат генерации в папку history/<timestamp>."""
@@ -194,6 +180,10 @@ def save_history(
         "generation_time_sec": round(generation_time_sec, 1) if generation_time_sec is not None else None,
         "experiment_id":       experiment_id,
         "pipeline_mode":       pipeline_mode,
+        "prompt_tokens":       usage.get("prompt_tokens")     if usage else None,
+        "completion_tokens":   usage.get("completion_tokens") if usage else None,
+        "total_tokens":        usage.get("total_tokens")      if usage else None,
+        "cost_usd":            usage.get("cost_usd")          if usage else None,
     }
     (folder / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     (folder / "metrics.json").write_text(json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")

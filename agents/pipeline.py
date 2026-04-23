@@ -1,5 +1,39 @@
 from crewai import Agent, Task, Crew, Process, LLM
 
+try:
+    from litellm import cost_per_token as litellm_cost_per_token
+except ImportError:
+    litellm_cost_per_token = None
+
+def _extract_usage(crew, model: str) -> dict:
+    """Извлекает статистику токенов из crew.usage_metrics и считает стоимость."""
+    try:
+        u = crew.usage_metrics
+        prompt_tokens     = int(u.prompt_tokens)
+        completion_tokens = int(u.completion_tokens)
+        total_tokens      = int(u.total_tokens)
+    except Exception:
+        return {"prompt_tokens": None, "completion_tokens": None,
+                "total_tokens": None, "cost_usd": None}
+    try:
+        if litellm_cost_per_token is None:
+            raise ImportError
+        p_cost, c_cost = litellm_cost_per_token(
+            model=model,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+        )
+        cost_usd = round(p_cost + c_cost, 6)
+    except Exception:
+        cost_usd = None
+    return {
+        "prompt_tokens":     prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens":      total_tokens,
+        "cost_usd":          cost_usd,
+    }
+
+
 CODER_PROMPTS = {
     "class": """
 На основе полученной архитектуры напиши ТОЛЬКО код PlantUML — диаграмму классов.
@@ -100,7 +134,8 @@ def run_single_agent(requirements: str, diagram_type: str = "class", model: str 
     )
 
     crew.kickoff()
-    return task.output.raw, ""
+    usage = _extract_usage(crew, model)
+    return task.output.raw, "", usage
 
 
 def run_pipeline(requirements: str, diagram_type: str = "class", model: str = "gpt-4o-mini") -> tuple[str, str]:
@@ -286,9 +321,126 @@ def run_pipeline(requirements: str, diagram_type: str = "class", model: str = "g
     )
 
     crew.kickoff()
-    diagram = task5.output.raw   # финальная исправленная диаграмма
-    critique = task4.output.raw  # замечания критика (сохраняется в историю, не показывается в UI)
-    return diagram, critique
+    diagram = task5.output.raw
+    critique = task4.output.raw
+    usage = _extract_usage(crew, model)
+    return diagram, critique, usage
+
+
+def run_pipeline_slim(requirements: str, diagram_type: str = "class", model: str = "gpt-4o-mini") -> tuple[str, str, dict]:
+    """
+    Пайплайн с ограниченным контекстом — каждый агент видит только вывод предыдущего.
+    Экономит токены: Coder не получает вывод Аналитика, Critic — только PlantUML-код.
+    """
+    llm = LLM(model=model)
+
+    analyst = Agent(
+        role="Senior Business Analyst",
+        goal="Точно извлечь из требований только то, что явно в них написано: сущности, их атрибуты, статусы, действия и взаимодействия между ними.",
+        backstory=(
+            "Ты опытный бизнес-аналитик. Твой главный принцип: строгое следование тексту требований.\n"
+            "- ты извлекаешь только то, что явно упомянуто — не додумываешь и не расширяешь\n"
+            "- если в требованиях есть статус объекта — выписываешь его значения как перечисление\n"
+            "- если упомянуто действие — определяешь метод с сигнатурой\n"
+            "- ты НЕ добавляешь инфраструктуру, сервисы, события или исключения если их нет в требованиях"
+        ),
+        verbose=True, allow_delegation=False, llm=llm,
+    )
+
+    architect = Agent(
+        role="Principal System Architect",
+        goal="Спроектировать архитектуру строго на основе анализа: только те блоки и связи, которые следуют из требований.",
+        backstory=(
+            "Ты главный архитектор с экспертизой в UML и SysML. Твои принципы:\n"
+            "- ты проектируешь ТОЛЬКО то, что есть в требованиях\n"
+            "- каждый enum подключается к классу явной стрелкой\n"
+            "- тип каждой связи указывается явно: композиция, агрегация, зависимость, ассоциация"
+        ),
+        verbose=True, allow_delegation=False, llm=llm,
+    )
+
+    coder = Agent(
+        role="PlantUML Expert Engineer",
+        goal=f"Написать полный и валидный код PlantUML для диаграммы типа '{diagram_type}'.",
+        backstory=(
+            "Ты эксперт по PlantUML. Твои правила абсолютны:\n"
+            "- ты пишешь ТОЛЬКО код — никакого текста, пояснений или markdown вокруг\n"
+            "- каждый атрибут имеет тип, каждый метод имеет скобки"
+        ),
+        verbose=True, allow_delegation=False, llm=llm,
+    )
+
+    critic = Agent(
+        role="UML Diagram Critic",
+        goal="Критически оценить PlantUML-диаграмму: выявить пропущенные элементы и ошибки нотации.",
+        backstory=(
+            "Ты строгий эксперт по UML. Ты сравниваешь диаграмму с исходными требованиями, "
+            "проверяешь корректность нотации и формулируешь конкретные замечания."
+        ),
+        verbose=True, allow_delegation=False, llm=llm,
+    )
+
+    task1 = Task(
+        description=(
+            f"Проанализируй текст требований:\n\n{requirements}\n\n"
+            "Выпиши: все сущности с атрибутами и типами, перечисления статусов, методы, события, сценарии ошибок."
+        ),
+        expected_output="Структурированный анализ: сущности, enum-перечисления, методы, события.",
+        agent=analyst,
+    )
+
+    task2 = Task(
+        description=(
+            "На основе анализа спроектируй архитектуру: блоки с атрибутами и методами, "
+            "типы всех связей явно, enum-классы, группировка в пакеты."
+        ),
+        expected_output="Полная архитектура с блоками, типами связей, enum-классами, пакетами.",
+        agent=architect,
+        context=[task1],
+    )
+
+    task3 = Task(
+        description=CODER_PROMPTS[diagram_type],
+        expected_output="Только код PlantUML — от @startuml до @enduml, без какого-либо текста вокруг.",
+        agent=coder,
+        context=[task2],
+    )
+
+    task4 = Task(
+        description=(
+            f"Ты получил исходные требования и PlantUML-код диаграммы типа '{diagram_type}'.\n\n"
+            f"ИСХОДНЫЕ ТРЕБОВАНИЯ:\n{requirements}\n\n"
+            "Проверь диаграмму: пропущенные элементы, ошибки нотации, общая оценка 0–10."
+        ),
+        expected_output="Markdown-отчёт: пропущенные элементы, ошибки нотации, оценка 0–10.",
+        agent=critic,
+        context=[task3],
+    )
+
+    task5 = Task(
+        description=(
+            f"Исправь PlantUML-диаграмму типа '{diagram_type}' по замечаниям критика.\n"
+            "Добавь пропущенное, исправь нотацию, не удаляй правильное.\n"
+            "НЕ пиши никаких пояснений — только исправленный код от @startuml до @enduml."
+        ),
+        expected_output="Только исправленный код PlantUML — от @startuml до @enduml.",
+        agent=coder,
+        context=[task3, task4],
+    )
+
+    crew = Crew(
+        agents=[analyst, architect, coder, critic],
+        tasks=[task1, task2, task3, task4, task5],
+        verbose=True,
+        process=Process.sequential,
+        output_log_file="agent_thoughts.log",
+    )
+
+    crew.kickoff()
+    diagram = task5.output.raw
+    critique = task4.output.raw
+    usage = _extract_usage(crew, model)
+    return diagram, critique, usage
 
 
 def run_evaluation(

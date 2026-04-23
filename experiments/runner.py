@@ -16,7 +16,6 @@ import json
 import time
 from pathlib import Path
 
-# Добавляем корень проекта в путь
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import config
@@ -24,33 +23,20 @@ from agents.pipeline import run_pipeline
 from utils.diagram import clean_output, validate_puml, render_png
 from utils.metrics import compute_metrics, save_history
 
-# ══════════════════════════════════════════════════════════════════════════════
-# КОНФИГУРАЦИЯ ЭКСПЕРИМЕНТА — редактируй здесь
-# ══════════════════════════════════════════════════════════════════════════════
-
 EXPERIMENT_ID = "exp_001"
 
-# Папка с тест-кейсами: "cases" (структурированные) или "cases_natural" (живой текст)
 CASES_DIR = Path(__file__).parent / "cases_natural"
 
-# Какие файлы запускать (None = все .txt в папке)
 CASE_FILES: list[str] | None = None
-# Пример: CASE_FILES = ["01_library.txt", "02_atm.txt"]
 
-# Типы диаграмм для прогона
 DIAGRAM_TYPES = ["class", "sequence", "component", "activity"]
 
-# Модели: {отображаемое_имя: ID для LiteLLM}
 MODELS = {
     "gpt-5":   "gpt-5",
     "gemini":  "gemini/gemini-3-flash-preview",
-    # "claude": "anthropic/claude-3-5-haiku-20241022",
 }
 
-# Пропускать уже выполненные комбинации при повторном запуске
 SKIP_EXISTING = True
-
-# ══════════════════════════════════════════════════════════════════════════════
 
 
 def _results_dir() -> Path:
@@ -87,7 +73,6 @@ def main() -> None:
     results_dir = _results_dir()
     done = _load_existing(results_dir) if SKIP_EXISTING else set()
 
-    # Сохраняем конфиг эксперимента
     cfg_path = results_dir / "config.json"
     if not cfg_path.exists():
         cfg = {
@@ -99,7 +84,6 @@ def main() -> None:
         }
         cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    # Список кейсов
     if CASE_FILES:
         cases = [CASES_DIR / f for f in CASE_FILES]
     else:
@@ -133,7 +117,7 @@ def main() -> None:
 
                 try:
                     t_start = time.time()
-                    raw, critique = run_pipeline(requirements, diagram_type, model_id)
+                    raw, critique, usage = run_pipeline(requirements, diagram_type, model_id)
                     gen_time = time.time() - t_start
 
                     puml = clean_output(raw)
@@ -155,6 +139,7 @@ def main() -> None:
                         requirements, diagram_type, model_id, puml, png,
                         metrics, critique, None, gen_time,
                         experiment_id=EXPERIMENT_ID,
+                        usage=usage,
                     )
 
                     row = {
@@ -165,6 +150,7 @@ def main() -> None:
                         "generation_time_sec": round(gen_time, 1),
                         "history_folder": history_folder.name,
                         **metrics,
+                        **{k: usage.get(k) for k in ("prompt_tokens", "completion_tokens", "total_tokens", "cost_usd")},
                     }
                     _append_row(results_dir, row)
                     done_count += 1

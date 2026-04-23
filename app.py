@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 
 import config
-from agents.pipeline import run_pipeline, run_single_agent, run_evaluation
+from agents.pipeline import run_pipeline, run_pipeline_slim, run_single_agent, run_evaluation
 from utils.diagram import clean_output, validate_puml, render_png
 from utils.file_reader import read_uploaded_file
 from utils.metrics import compute_metrics, save_history, load_history
@@ -123,10 +123,18 @@ with tab_generate:
 
         pipeline_mode = st.radio(
             "Режим генерации",
-            options=["Мультиагентный пайплайн (5 агентов)", "Одиночный агент (baseline)"],
-            help="Baseline: только один агент-кодер без Analyst и Architect. Используется для сравнения.",
+            options=[
+                "Мультиагентный пайплайн (5 агентов)",
+                "Мультиагентный slim (ограниченный контекст)",
+                "Одиночный агент (baseline)",
+            ],
+            help=(
+                "Slim: каждый агент видит только вывод предыдущего — экономит токены. "
+                "Baseline: только один агент-кодер без Analyst и Architect."
+            ),
         )
         use_single_agent = pipeline_mode.startswith("Одиночный")
+        use_slim = pipeline_mode.startswith("Мультиагентный slim")
 
         run_analysis = st.toggle("Требуется анализ результатов", value=False,
                                  help="Запускает агента-оценщика после генерации. Увеличивает время.")
@@ -149,9 +157,11 @@ with tab_generate:
 
                     t_start = time.time()
                     if use_single_agent:
-                        raw_result, critique = run_single_agent(requirements, diagram_type, model_id)
+                        raw_result, critique, usage = run_single_agent(requirements, diagram_type, model_id)
+                    elif use_slim:
+                        raw_result, critique, usage = run_pipeline_slim(requirements, diagram_type, model_id)
                     else:
-                        raw_result, critique = run_pipeline(requirements, diagram_type, model_id)
+                        raw_result, critique, usage = run_pipeline(requirements, diagram_type, model_id)
                     generation_time_sec = time.time() - t_start
 
                     progress.progress(75, text="Валидация...")
@@ -178,8 +188,15 @@ with tab_generate:
                         if png_bytes:
                             Path("diagram.png").write_bytes(png_bytes)
 
+                        if use_single_agent:
+                            mode_str = "single"
+                        elif use_slim:
+                            mode_str = "multi_slim"
+                        else:
+                            mode_str = "multi"
                         save_history(requirements, diagram_type, model_id, puml_code, png_bytes, metrics, critique, evaluation, generation_time_sec,
-                                     pipeline_mode="single" if use_single_agent else "multi")
+                                     pipeline_mode=mode_str,
+                                     usage=usage)
 
                         progress.progress(100, text="Готово!")
                         status.success("Диаграмма сгенерирована и сохранена в историю.")
@@ -199,6 +216,13 @@ with tab_generate:
                         u6.metric("Лишних эл.",       f"{metrics['excess_elements_pct']}%")
                         u7.metric("Изолир. узлов",    metrics["isolated_nodes_count"])
                         u8.metric("Время генерации",  f"{generation_time_sec:.1f} с")
+
+                        t1, t2, t3, t4 = st.columns(4)
+                        t1.metric("Prompt tokens",      usage.get("prompt_tokens") or "—")
+                        t2.metric("Completion tokens",  usage.get("completion_tokens") or "—")
+                        t3.metric("Total tokens",       usage.get("total_tokens") or "—")
+                        cost = usage.get("cost_usd")
+                        t4.metric("Стоимость",          f"${cost:.4f}" if cost else "—")
 
                         # Специфичные по типу — только если есть в метриках
                         type_specific_keys = [
@@ -352,13 +376,17 @@ with tab_analytics:
             meta    = json.loads(meta_path.read_text(encoding="utf-8"))
             metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
             mode_raw = meta.get("pipeline_mode", "multi")
-            mode_label = "1 агент" if mode_raw == "single" else "5 агентов"
+            mode_label = {"single": "1 агент", "multi_slim": "5 агентов slim", "multi": "5 агентов"}.get(mode_raw, mode_raw)
             row = {
-                "Дата":    meta.get("timestamp", ""),
-                "Тип":     meta.get("diagram_type", ""),
-                "Модель":  meta.get("model", ""),
-                "Режим":   mode_label,
-                "Время (с)": meta.get("generation_time_sec"),
+                "Дата":              meta.get("timestamp", ""),
+                "Тип":               meta.get("diagram_type", ""),
+                "Модель":            meta.get("model", ""),
+                "Режим":             mode_label,
+                "Время (с)":         meta.get("generation_time_sec"),
+                "Prompt tokens":     meta.get("prompt_tokens"),
+                "Completion tokens": meta.get("completion_tokens"),
+                "Total tokens":      meta.get("total_tokens"),
+                "Стоимость ($)":     meta.get("cost_usd"),
             }
             row.update(metrics)   # все метрики как есть
             rows.append(row)
