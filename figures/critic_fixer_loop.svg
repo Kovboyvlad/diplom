@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="620" viewBox="0 0 1500 620">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7fafc"/>
+      <stop offset="1" stop-color="#eef4f8"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#334155" flood-opacity="0.14"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb"/>
+    </marker>
+    <style>
+      .title { font-family: Arial, sans-serif; font-size: 34px; font-weight: 700; fill: #172033; }
+      .subtitle { font-family: Arial, sans-serif; font-size: 20px; fill: #526173; }
+      .box-title { font-family: Arial, sans-serif; font-size: 23px; font-weight: 700; fill: #172033; }
+      .box-text { font-family: Arial, sans-serif; font-size: 18px; fill: #3f4d5f; }
+      .small { font-family: Arial, sans-serif; font-size: 16px; fill: #526173; }
+      .metric { font-family: Arial, sans-serif; font-size: 18px; font-weight: 700; fill: #0f766e; }
+      .arrow-label { font-family: Arial, sans-serif; font-size: 16px; font-weight: 700; fill: #334155; }
+      .panel { fill: white; stroke: #d6e1ea; stroke-width: 2; filter: url(#shadow); }
+      .engine { fill: #eff6ff; stroke: #93c5fd; }
+      .critic { fill: #fff7ed; stroke: #fdba74; }
+      .fixer { fill: #f0fdfa; stroke: #5eead4; }
+      .final { fill: #f8fafc; stroke: #94a3b8; }
+      .check { fill: #f0fdf4; stroke: #86efac; }
+      .flow { stroke: #334155; stroke-width: 4; fill: none; marker-end: url(#arrow); }
+      .feedback { stroke: #2563eb; stroke-width: 4; fill: none; stroke-dasharray: 12 10; marker-end: url(#arrowBlue); }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1500" height="620" fill="url(#bg)"/>
+
+  <text x="750" y="58" text-anchor="middle" class="title">Роль петли Critic → Fixer в повышении качества диаграммы</text>
+  <text x="750" y="92" text-anchor="middle" class="subtitle">Фрагмент агентного конвейера после генерации PlantUML-кода</text>
+
+  <rect x="52" y="152" rx="14" ry="14" width="250" height="190" class="panel engine"/>
+  <circle cx="92" cy="196" r="22" fill="#2563eb"/>
+  <text x="92" y="204" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="white">1</text>
+  <text x="128" y="190" class="box-title">Агент-инженер</text>
+  <text x="82" y="235" class="box-text">Формирует первую</text>
+  <text x="82" y="262" class="box-text">версию PlantUML-кода</text>
+  <text x="82" y="302" class="small">Результат: черновая</text>
+  <text x="82" y="326" class="small">UML-диаграмма</text>
+
+  <path d="M 314 247 L 395 247" class="flow"/>
+  <text x="354" y="227" text-anchor="middle" class="arrow-label">код</text>
+
+  <rect x="407" y="152" rx="14" ry="14" width="300" height="190" class="panel critic"/>
+  <circle cx="447" cy="196" r="22" fill="#ea580c"/>
+  <text x="447" y="204" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="white">2</text>
+  <text x="483" y="190" class="box-title">Агент-критик</text>
+  <text x="437" y="235" class="box-text">Выявляет дефекты:</text>
+  <text x="437" y="266" class="small">• ошибки нотации</text>
+  <text x="437" y="291" class="small">• структурные пропуски</text>
+  <text x="437" y="316" class="small">• несоответствия требованиям</text>
+
+  <path d="M 719 247 L 800 247" class="flow"/>
+  <text x="760" y="227" text-anchor="middle" class="arrow-label">замечания</text>
+
+  <rect x="812" y="152" rx="14" ry="14" width="280" height="190" class="panel fixer"/>
+  <circle cx="852" cy="196" r="22" fill="#0f766e"/>
+  <text x="852" y="204" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="white">3</text>
+  <text x="888" y="190" class="box-title">Агент-исправитель</text>
+  <text x="842" y="235" class="box-text">Дорабатывает код</text>
+  <text x="842" y="270" class="small">Добавляет связи,</text>
+  <text x="842" y="295" class="small">исправляет стрелки,</text>
+  <text x="842" y="320" class="small">подключает элементы</text>
+
+  <path d="M 1104 247 L 1185 247" class="flow"/>
+  <text x="1145" y="227" text-anchor="middle" class="arrow-label">исправленный код</text>
+
+  <rect x="1197" y="152" rx="14" ry="14" width="250" height="190" class="panel check"/>
+  <circle cx="1237" cy="196" r="22" fill="#16a34a"/>
+  <text x="1237" y="204" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="white">4</text>
+  <text x="1273" y="190" class="box-title">Повторная проверка</text>
+  <text x="1227" y="235" class="box-text">Контроль результата</text>
+  <text x="1227" y="270" class="small">Синтаксис, связи,</text>
+  <text x="1227" y="295" class="small">покрытие требований</text>
+  <text x="1227" y="326" class="metric">isolated_nodes_count = 0</text>
+
+  <path d="M 1322 355 C 1280 470, 1010 500, 952 357" class="feedback"/>
+  <text x="1138" y="493" text-anchor="middle" class="arrow-label" fill="#2563eb">при наличии замечаний — повторная доработка</text>
+
+  <rect x="376" y="414" rx="12" ry="12" width="748" height="92" class="panel final"/>
+  <text x="750" y="448" text-anchor="middle" class="box-title">Итоговый эффект</text>
+  <text x="750" y="483" text-anchor="middle" class="box-text">Ошибки PlantUML и изолированные элементы выявляются до сохранения финальной диаграммы</text>
+
+  <text x="750" y="568" text-anchor="middle" class="small">Рисунок 4.X — Роль петли Critic → Fixer в повышении качества диаграммы</text>
+</svg>

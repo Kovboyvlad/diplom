@@ -7,7 +7,7 @@ from pathlib import Path
 
 import config
 from agents.pipeline import run_pipeline
-from utils.diagram import clean_output, validate_puml, render_png
+from utils.diagram import clean_output, validate_puml, render_png, repair_puml
 
 REQUIREMENTS_TEXT = """\
 ПРОЕКТ: Автоматизированная система управления складом (Smart Warehouse WMS).
@@ -25,9 +25,9 @@ def main():
     print("### Запуск AI-агентов (CLI-режим)... ###")
 
     t_start = time.time()
-    raw, critique = run_pipeline(REQUIREMENTS_TEXT, DIAGRAM_TYPE)
+    raw, critique, usage, intermediates = run_pipeline(REQUIREMENTS_TEXT, DIAGRAM_TYPE)
     generation_time_sec = time.time() - t_start
-    puml_code = clean_output(raw)
+    puml_code = repair_puml(clean_output(raw), DIAGRAM_TYPE)
 
     if not validate_puml(puml_code):
         print("[ОШИБКА] Сгенерированный код не содержит @startuml/@enduml. Попробуйте запустить снова.")
@@ -37,17 +37,20 @@ def main():
     print("\nФайл diagram.puml сохранён.")
 
     print("Рендеринг PNG...")
-    png = render_png(puml_code)
+    png, render_error = render_png(puml_code)
     if png:
         Path("diagram.png").write_bytes(png)
         print("Файл diagram.png сохранён.")
     else:
         print("[ПРЕДУПРЕЖДЕНИЕ] Не удалось отрисовать PNG (проверьте соединение).")
+        if render_error:
+            print(render_error)
 
     print("\n### РЕЗУЛЬТАТ ###")
     print(puml_code)
 
     print(f"\nВремя генерации: {generation_time_sec:.1f} с")
+    print(f"Токены: {usage.get('total_tokens') or 'н/д'}")
 
     print("\n### ЗАМЕЧАНИЯ КРИТИКА ###")
     print(critique)

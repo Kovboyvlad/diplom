@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import config
 from agents.pipeline import run_pipeline
-from utils.diagram import clean_output, validate_puml, render_png
+from utils.diagram import clean_output, validate_puml, render_png, repair_puml
 from utils.metrics import compute_metrics, save_history
 
 EXPERIMENT_ID = "exp_001"
@@ -117,10 +117,10 @@ def main() -> None:
 
                 try:
                     t_start = time.time()
-                    raw, critique, usage = run_pipeline(requirements, diagram_type, model_id)
+                    raw, critique, usage, intermediates = run_pipeline(requirements, diagram_type, model_id)
                     gen_time = time.time() - t_start
 
-                    puml = clean_output(raw)
+                    puml = repair_puml(clean_output(raw), diagram_type)
 
                     if not validate_puml(puml):
                         print("  FAIL: невалидный PlantUML-код")
@@ -133,7 +133,8 @@ def main() -> None:
                         continue
 
                     metrics = compute_metrics(puml, requirements, diagram_type)
-                    png = render_png(puml)
+                    png, render_error = render_png(puml)
+                    metrics["syntax_valid"] = 1 if png else 0
 
                     history_folder = save_history(
                         requirements, diagram_type, model_id, puml, png,
@@ -150,6 +151,8 @@ def main() -> None:
                         "generation_time_sec": round(gen_time, 1),
                         "history_folder": history_folder.name,
                         **metrics,
+                        "render_status": "ok" if png else "error",
+                        "render_error": render_error or "",
                         **{k: usage.get(k) for k in ("prompt_tokens", "completion_tokens", "total_tokens", "cost_usd")},
                     }
                     _append_row(results_dir, row)

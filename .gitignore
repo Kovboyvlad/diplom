@@ -1,6 +1,9 @@
-.env
+﻿.env
+.env.*
+.streamlit/secrets.toml
 venv/
 __pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
 agent_thoughts.log*
@@ -9,5 +12,6 @@ agent_thoughts.log*
 diagram.puml
 diagram.png
 history/
+history_mbse/
 experiments/results/
-history/
+готовые/
